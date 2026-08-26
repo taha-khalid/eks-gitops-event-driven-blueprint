@@ -1,0 +1,44 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+
+metadata:
+  name: sqs-worker-rollout
+  namespace: default
+
+spec:
+  replics: 0 # KEDA dynamically updates this field
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: sqs-worker
+  strategy:
+    canary:
+      steps:
+        - setWeight: 20
+        - pause: { duration: 3m }
+        - setWeight: 50
+        - pause: { duration: 2m }
+  template:
+    metadata:
+      labels:
+        app: sqs-worker
+    spec:
+      serviceAccountName: sqs-worker-sa
+      # Target Karpenter's dedicated node pool
+      nodeSelector:
+        karpenter.sh/nodepool: sqs-worker-pool
+      tolerations:
+        - key: workload
+          value: sqs-worker
+          operator: Equal
+          effect: NoSchedule
+      containers:
+        - name: worker
+          image: my-app-imgae
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
